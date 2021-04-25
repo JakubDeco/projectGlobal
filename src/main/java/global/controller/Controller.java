@@ -6,11 +6,11 @@ import global.json.Json;
 import global.log.Log;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -25,6 +25,7 @@ public class Controller {
     private final ResponseEntity.BodyBuilder ok = ResponseEntity.status(200);
     private final ResponseEntity.BodyBuilder badRequest = ResponseEntity.status(400);
     private final ResponseEntity.BodyBuilder notFound = ResponseEntity.status(404);
+    private final ResponseEntity.BodyBuilder dbsError = ResponseEntity.status(502);
 
     @GetMapping("/v1/get_general_stats")
     public ResponseEntity<String> getGeneral(){
@@ -42,5 +43,42 @@ public class Controller {
         JSONObject object = j.getBySensorType(list);
         log.ok("Completed");
         return ok.contentType(MediaType.APPLICATION_JSON).body(object.toJSONString());
+    }
+
+    @PostMapping(value = "/v1/post_rainfall")
+    public ResponseEntity<String> postRainfall(@RequestBody String body){
+        try {
+            JSONObject jsonObject = (JSONObject) new JSONParser().parse(body);
+
+            if (jsonObject.isEmpty()){
+                log.error("Empty request body.");
+                return badRequest.body("Empty request body.");
+            }else if (jsonObject.get("sensor_type") == null
+                    || !jsonObject.get("sensor_type").equals("rainfall")
+                    || jsonObject.get("sensor_unit") == null
+                    || !jsonObject.get("sensor_unit").equals("bucket")
+                    || jsonObject.get("sensor_value") == null
+                    || !jsonObject.get("sensor_value").equals(1.0)){
+                log.error("Incorrect request body. 1");
+                return badRequest.body("Incorrect request body.");
+            }
+            String sensor_type = (String) jsonObject.get("sensor_type");
+            String sensor_unit = (String) jsonObject.get("sensor_unit");
+            float sensor_value =  Float.parseFloat(String.valueOf(jsonObject.get("sensor_value")));
+
+            if (dat.insertRecord(new Sensor(sensor_type,sensor_unit,sensor_value))){
+                log.ok("post_rainfall successful");
+                return ok.body("Measurement recorded.");
+            }else {
+                log.error("Database insert failed.");
+                return dbsError.body("Database insert failed.");
+            }
+
+
+        } catch (ParseException e) {
+            log.error(e.toString());
+            return badRequest.body("Incorrect request body.");
+
+        }
     }
 }
