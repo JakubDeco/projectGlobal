@@ -81,4 +81,42 @@ public class Controller {
 
         }
     }
+    //// copied
+    @PostMapping(value = "/v1/post_temperature")
+    public ResponseEntity<String> postTemperature(@RequestBody String body){
+        try {
+            JSONObject jsonObject = (JSONObject) new JSONParser().parse(body);
+
+            if (jsonObject.isEmpty()){
+                log.error("Empty request body.");
+                return badRequest.body("Empty request body.");
+            }else if (jsonObject.get("sensor_type") == null
+                    || !jsonObject.get("sensor_type").equals("temperature")
+                    || jsonObject.get("sensor_unit") == null
+                    || !jsonObject.get("sensor_unit").equals("celsius")
+                    || jsonObject.get("sensor_value") == null
+                    || !(jsonObject.get("sensor_value") instanceof Number) ){
+                log.error("Incorrect request body. 1");
+                return badRequest.body("Incorrect request body.");
+            }
+            String sensor_type = (String) jsonObject.get("sensor_type");
+            String sensor_unit = (String) jsonObject.get("sensor_unit");
+            float sensor_value =  Float.parseFloat(String.valueOf(jsonObject.get("sensor_value")));
+
+            if (dat.insertRecord(new Sensor(sensor_type,sensor_unit,sensor_value))){
+                log.ok("post_temperature successful");
+                return ok.body("Measurement recorded.");
+            }else {
+                log.error("Database insert failed.");
+                return dbsError.body("Database insert failed.");
+            }
+
+
+        } catch (ParseException | NumberFormatException e) {
+            log.error(e.toString());
+            return badRequest.body("Incorrect request body.");
+
+        }
+    }
+    ////
 }
